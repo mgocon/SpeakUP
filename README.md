@@ -1,6 +1,6 @@
 # SpeakUP: Real-Time Feedback for Better Interviews
 > [!NOTE]
-> This game is a product of a research paper titled: **Adaptive Game Dynamics: Comparing Deep Q-Network and Proximal Policy Optimization for Real-Time Feedback in a Job Interview Training  Simulation**
+> This game is a product of a research paper titled: **Adaptive Game Dynamics: Comparing Deep Q-Network and Proximal Policy Optimization for Real-Time Feedback in a Job Interview Training  Simulation A.Y.2025-2026**
 
 
 ## Abstract
@@ -36,3 +36,9 @@ At the same time, the study explores how **DQN and PPO** can be used to provide 
 ![Senior Level Question](Screenshots/05.png)
 ![Senior Level Result](Screenshots/06.png)
 ![Game Summary Result](Screenshots/07.png)
+
+## Game Download
+Google Drive: 
+- [SpeakUP Windows Version](https://drive.google.com/file/d/1gxyBbMSIf4XBnMeDapKWBJ1ICHxRhsDd/view?usp=sharing "SpeakUP.zip")
+
+- [SpeakUP Apple Silicoon + Intel Version](https://drive.google.com/file/d/1WHuzXhJ-8MO8B848aM8-rBsIw8obcuxM/view?usp=sharing "SpeakUP(Apple).zip")
