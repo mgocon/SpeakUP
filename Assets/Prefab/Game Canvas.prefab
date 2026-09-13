@@ -10777,6 +10777,7 @@ MonoBehaviour:
   needsImprovementColor: {r: 0.9, g: 0.3, b: 0.3, a: 1}
   selectedColor: {r: 0.3, g: 0.6, b: 1, a: 1}
   fadeInDuration: 0.5
+  showOnlyDQN: 1
   OnFeedbackChosen:
     m_PersistentCalls:
       m_Calls: []

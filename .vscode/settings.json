@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "GD9_Thesis.sln"
+    "dotnet.defaultSolution": "SpeakUP.sln"
 }
