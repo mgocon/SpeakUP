@@ -19,25 +19,36 @@ public class SpeedTrackerUI : MonoBehaviour
     [SerializeField] private float updateInterval = 0.5f;
 
     private FeedbackManager feedbackManager;
+    private FeedbackComparisonUI feedbackComparisonUI;
+    private bool lastDQNOnlyMode;
     private float lastUpdateTime;
 
     private void Start()
     {
         feedbackManager = FeedbackManager.Instance;
+        feedbackComparisonUI = FindObjectOfType<FeedbackComparisonUI>(true);
+        lastDQNOnlyMode = IsDQNOnlyMode();
+
         // Initialize visibility. If a speedPanel GameObject is assigned, use it.
         // Otherwise toggle the individual text objects so the UI can be placed anywhere.
-        if (speedPanel != null)
-        {
-            speedPanel.SetActive(showOnStart);
-        }
-        else
-        {
-            SetVisibility(showOnStart);
-        }
+        SetVisibility(!lastDQNOnlyMode && showOnStart);
     }
 
     private void Update()
     {
+        bool dqnOnlyMode = IsDQNOnlyMode();
+        if (dqnOnlyMode != lastDQNOnlyMode)
+        {
+            lastDQNOnlyMode = dqnOnlyMode;
+            SetVisibility(!dqnOnlyMode && showOnStart);
+        }
+
+        if (dqnOnlyMode)
+        {
+            SetVisibility(false);
+            return;
+        }
+
         if (!updateRealtime || feedbackManager == null)
             return;
 
@@ -46,6 +57,14 @@ public class SpeedTrackerUI : MonoBehaviour
             UpdateSpeedDisplay();
             lastUpdateTime = Time.time;
         }
+    }
+
+    private bool IsDQNOnlyMode()
+    {
+        if (feedbackComparisonUI == null)
+            feedbackComparisonUI = FindObjectOfType<FeedbackComparisonUI>(true);
+
+        return feedbackComparisonUI != null && feedbackComparisonUI.showOnlyDQN;
     }
 
     public void UpdateSpeedDisplay()

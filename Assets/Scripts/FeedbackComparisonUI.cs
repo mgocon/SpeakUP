@@ -182,7 +182,7 @@ public class FeedbackComparisonUI : MonoBehaviour
             dqnTitle, dqnMessage, dqnPerformanceText,
             dqnConfidenceBar, dqnClarityBar, dqnPaceBar, dqnToneBar, dqnOverallBar,
             dqnConfidenceValue, dqnClarityValue, dqnPaceValue, dqnToneValue,
-            currentDQNFeedback, "Feedback B"
+            currentDQNFeedback, showOnlyDQN ? "Feedback" : "Feedback B"
         );
 
         // Show/hide PPO panel based on display mode
