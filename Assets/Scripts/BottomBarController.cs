@@ -55,6 +55,12 @@ public class BottomBarController : MonoBehaviour
     private Coroutine leftBoxCoroutine;
     private Coroutine rightBoxCoroutine;
     private Coroutine topBoxCoroutine;
+    private Vector2 rightBoxOriginalAnchoredPosition;
+    private Vector2 rightBoxOriginalAnchorMin;
+    private Vector2 rightBoxOriginalAnchorMax;
+    private Vector2 rightBoxOriginalPivot;
+    private bool rightBoxLayoutCaptured;
+    private bool rightBoxCenteredForDQNOnly;
     private int sentenceIndex = -1;
     private StoryScene currentScene;
     private List<int> playbackOrder;
@@ -190,16 +196,22 @@ public class BottomBarController : MonoBehaviour
     public void OnPopupBoxesPressed()
     {
         areBoxesVisible = !areBoxesVisible;
+        bool dqnOnlyMode = feedbackComparisonUI != null && feedbackComparisonUI.showOnlyDQN;
 
-        // Left box: slides horizontally to the right when showing
+        SetDQNOnlyBoxLayout(dqnOnlyMode);
+
+        // Left box: slides horizontally to the right when showing (hidden in DQN-only mode)
         if (leftBox != null)
         {
-            if (leftBoxCoroutine != null)
+            if (!dqnOnlyMode)
             {
-                StopCoroutine(leftBoxCoroutine);
-                leftBoxCoroutine = null;
+                if (leftBoxCoroutine != null)
+                {
+                    StopCoroutine(leftBoxCoroutine);
+                    leftBoxCoroutine = null;
+                }
+                leftBoxCoroutine = StartCoroutine(SlideBox(leftBox, areBoxesVisible, Vector2.right, boxesSlideDistance, boxesSlideDuration, () => leftBoxCoroutine = null));
             }
-            leftBoxCoroutine = StartCoroutine(SlideBox(leftBox, areBoxesVisible, Vector2.right, boxesSlideDistance, boxesSlideDuration, () => leftBoxCoroutine = null));
         }
 
         // Right box: slides horizontally to the left when showing
@@ -210,18 +222,30 @@ public class BottomBarController : MonoBehaviour
                 StopCoroutine(rightBoxCoroutine);
                 rightBoxCoroutine = null;
             }
-            rightBoxCoroutine = StartCoroutine(SlideBox(rightBox, areBoxesVisible, Vector2.left, boxesSlideDistance, boxesSlideDuration, () => rightBoxCoroutine = null));
+
+            if (dqnOnlyMode && areBoxesVisible)
+            {
+                rightBox.gameObject.SetActive(true);
+                rightBox.anchoredPosition = new Vector2(0f, rightBox.anchoredPosition.y);
+            }
+            else
+            {
+                rightBoxCoroutine = StartCoroutine(SlideBox(rightBox, areBoxesVisible, Vector2.left, boxesSlideDistance, boxesSlideDuration, () => rightBoxCoroutine = null));
+            }
         }
 
-        // Also show/hide the top box (third choice) if present
+        // Also show/hide the top box (third choice) if present (hidden in DQN-only mode)
         if (topBox != null)
         {
-            if (topBoxCoroutine != null)
+            if (!dqnOnlyMode)
             {
-                StopCoroutine(topBoxCoroutine);
-                topBoxCoroutine = null;
+                if (topBoxCoroutine != null)
+                {
+                    StopCoroutine(topBoxCoroutine);
+                    topBoxCoroutine = null;
+                }
+                topBoxCoroutine = StartCoroutine(SlideBox(topBox, areBoxesVisible, Vector2.down, boxesSlideDistance, boxesSlideDuration, () => topBoxCoroutine = null));
             }
-            topBoxCoroutine = StartCoroutine(SlideBox(topBox, areBoxesVisible, Vector2.down, boxesSlideDistance, boxesSlideDuration, () => topBoxCoroutine = null));
         }
     }
 
@@ -249,21 +273,35 @@ public class BottomBarController : MonoBehaviour
         // NEW: Generate and show BOTH feedbacks immediately when Done is pressed
         GenerateFeedbackComparison();
 
+        // Determine if we're in DQN-only mode
+        bool dqnOnlyMode = feedbackComparisonUI != null && feedbackComparisonUI.showOnlyDQN;
+        SetDQNOnlyBoxLayout(dqnOnlyMode);
+
         // Show the PPO/DQN choice boxes (these now act as "Choose PPO" / "Choose DQN")
         areBoxesVisible = !areBoxesVisible;
 
-    Debug.Log($"OnDoneButtonPressed: areBoxesVisible={areBoxesVisible}, leftBox={(leftBox!=null)}, rightBox={(rightBox!=null)}, topBox={(topBox!=null)}");
+    Debug.Log($"OnDoneButtonPressed: areBoxesVisible={areBoxesVisible}, dqnOnlyMode={dqnOnlyMode}, leftBox={(leftBox!=null)}, rightBox={(rightBox!=null)}, topBox={(topBox!=null)}");
 
+    // Left box (PPO) - hide if in DQN-only mode
     if (leftBox != null)
         {
-            if (leftBoxCoroutine != null)
+            if (!dqnOnlyMode)
             {
-                StopCoroutine(leftBoxCoroutine);
-                leftBoxCoroutine = null;
+                if (leftBoxCoroutine != null)
+                {
+                    StopCoroutine(leftBoxCoroutine);
+                    leftBoxCoroutine = null;
+                }
+                leftBoxCoroutine = StartCoroutine(SlideBox(leftBox, areBoxesVisible, Vector2.right, boxesSlideDistance, boxesSlideDuration, () => leftBoxCoroutine = null));
             }
-            leftBoxCoroutine = StartCoroutine(SlideBox(leftBox, areBoxesVisible, Vector2.right, boxesSlideDistance, boxesSlideDuration, () => leftBoxCoroutine = null));
+            else
+            {
+                // In DQN-only mode, ensure left box stays hidden
+                leftBox.gameObject.SetActive(false);
+            }
         }
 
+        // Right box (DQN) - always show/hide based on areBoxesVisible
         if (rightBox != null)
         {
             if (rightBoxCoroutine != null)
@@ -271,27 +309,44 @@ public class BottomBarController : MonoBehaviour
                 StopCoroutine(rightBoxCoroutine);
                 rightBoxCoroutine = null;
             }
-            rightBoxCoroutine = StartCoroutine(SlideBox(rightBox, areBoxesVisible, Vector2.left, boxesSlideDistance, boxesSlideDuration, () => rightBoxCoroutine = null));
+
+            if (dqnOnlyMode && areBoxesVisible)
+            {
+                rightBox.gameObject.SetActive(true);
+                rightBox.anchoredPosition = new Vector2(0f, rightBox.anchoredPosition.y);
+            }
+            else
+            {
+                rightBoxCoroutine = StartCoroutine(SlideBox(rightBox, areBoxesVisible, Vector2.left, boxesSlideDistance, boxesSlideDuration, () => rightBoxCoroutine = null));
+            }
         }
 
-        // Ensure top box is handled exactly like left/right: activate if showing and start slide
+        // Top box (Neither) - hide if in DQN-only mode
         if (topBox != null)
         {
-            Debug.Log($"OnDoneButtonPressed: preparing topBox (activeBefore={topBox.gameObject.activeSelf})");
-            // If we're showing boxes and the topBox (or its parent) is inactive, try to activate the GameObject so the slide coroutine can manipulate it.
-            if (areBoxesVisible && !topBox.gameObject.activeSelf)
+            if (!dqnOnlyMode)
             {
-                topBox.gameObject.SetActive(true);
-                Debug.Log("OnDoneButtonPressed: topBox set active before starting slide");
-            }
+                Debug.Log($"OnDoneButtonPressed: preparing topBox (activeBefore={topBox.gameObject.activeSelf})");
+                // If we're showing boxes and the topBox (or its parent) is inactive, try to activate the GameObject so the slide coroutine can manipulate it.
+                if (areBoxesVisible && !topBox.gameObject.activeSelf)
+                {
+                    topBox.gameObject.SetActive(true);
+                    Debug.Log("OnDoneButtonPressed: topBox set active before starting slide");
+                }
 
-            if (topBoxCoroutine != null)
-            {
-                StopCoroutine(topBoxCoroutine);
-                topBoxCoroutine = null;
+                if (topBoxCoroutine != null)
+                {
+                    StopCoroutine(topBoxCoroutine);
+                    topBoxCoroutine = null;
+                }
+                Debug.Log("OnDoneButtonPressed: starting topBox slide coroutine");
+                topBoxCoroutine = StartCoroutine(SlideBox(topBox, areBoxesVisible, Vector2.down, boxesSlideDistance, boxesSlideDuration, () => topBoxCoroutine = null));
             }
-            Debug.Log("OnDoneButtonPressed: starting topBox slide coroutine");
-            topBoxCoroutine = StartCoroutine(SlideBox(topBox, areBoxesVisible, Vector2.down, boxesSlideDistance, boxesSlideDuration, () => topBoxCoroutine = null));
+            else
+            {
+                // In DQN-only mode, ensure top box stays hidden
+                topBox.gameObject.SetActive(false);
+            }
         }
 
         // disable Done button to avoid multiple presses until next question
@@ -429,10 +484,50 @@ public class BottomBarController : MonoBehaviour
         onComplete?.Invoke();
     }
 
+    private void SetDQNOnlyBoxLayout(bool dqnOnlyMode)
+    {
+        if (rightBox == null)
+            return;
+
+        if (!rightBoxLayoutCaptured)
+        {
+            rightBoxOriginalAnchoredPosition = rightBox.anchoredPosition;
+            rightBoxOriginalAnchorMin = rightBox.anchorMin;
+            rightBoxOriginalAnchorMax = rightBox.anchorMax;
+            rightBoxOriginalPivot = rightBox.pivot;
+            rightBoxLayoutCaptured = true;
+        }
+
+        if (dqnOnlyMode && !rightBoxCenteredForDQNOnly)
+        {
+            rightBox.anchorMin = new Vector2(0.5f, rightBox.anchorMin.y);
+            rightBox.anchorMax = new Vector2(0.5f, rightBox.anchorMax.y);
+            rightBox.anchoredPosition = new Vector2(0f, rightBox.anchoredPosition.y);
+            rightBoxCenteredForDQNOnly = true;
+        }
+        else if (!dqnOnlyMode && rightBoxCenteredForDQNOnly)
+        {
+            rightBox.anchorMin = rightBoxOriginalAnchorMin;
+            rightBox.anchorMax = rightBoxOriginalAnchorMax;
+            rightBox.pivot = rightBoxOriginalPivot;
+            rightBox.anchoredPosition = rightBoxOriginalAnchoredPosition;
+            rightBoxCenteredForDQNOnly = false;
+        }
+    }
+
     private void Awake()
     {
         // Note: We don't use OnFeedbackChosen event anymore
         // Player directly clicks PPO/DQN buttons to choose
+
+        if (rightBox != null)
+        {
+            rightBoxOriginalAnchoredPosition = rightBox.anchoredPosition;
+            rightBoxOriginalAnchorMin = rightBox.anchorMin;
+            rightBoxOriginalAnchorMax = rightBox.anchorMax;
+            rightBoxOriginalPivot = rightBox.pivot;
+            rightBoxLayoutCaptured = true;
+        }
         
         if (voskSpeechToText == null)
         {
@@ -631,8 +726,40 @@ public class BottomBarController : MonoBehaviour
         // Hide popup boxes if visible
         if (areBoxesVisible)
         {
-            // OnPopupBoxesPressed toggles visibility and starts the hide coroutines
-            OnPopupBoxesPressed();
+            bool dqnOnlyMode = feedbackComparisonUI != null && feedbackComparisonUI.showOnlyDQN;
+            
+            // Hide all visible boxes
+            if (leftBox != null && leftBox.gameObject.activeSelf)
+            {
+                if (leftBoxCoroutine != null)
+                {
+                    StopCoroutine(leftBoxCoroutine);
+                    leftBoxCoroutine = null;
+                }
+                leftBoxCoroutine = StartCoroutine(SlideBox(leftBox, false, Vector2.right, boxesSlideDistance, boxesSlideDuration, () => leftBoxCoroutine = null));
+            }
+
+            if (rightBox != null && rightBox.gameObject.activeSelf)
+            {
+                if (rightBoxCoroutine != null)
+                {
+                    StopCoroutine(rightBoxCoroutine);
+                    rightBoxCoroutine = null;
+                }
+                rightBoxCoroutine = StartCoroutine(SlideBox(rightBox, false, Vector2.left, boxesSlideDistance, boxesSlideDuration, () => rightBoxCoroutine = null));
+            }
+
+            if (topBox != null && topBox.gameObject.activeSelf && !dqnOnlyMode)
+            {
+                if (topBoxCoroutine != null)
+                {
+                    StopCoroutine(topBoxCoroutine);
+                    topBoxCoroutine = null;
+                }
+                topBoxCoroutine = StartCoroutine(SlideBox(topBox, false, Vector2.down, boxesSlideDistance, boxesSlideDuration, () => topBoxCoroutine = null));
+            }
+            
+            areBoxesVisible = false;
         }
     }
 

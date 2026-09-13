@@ -18,6 +18,7 @@ public class GameSummaryScreen : MonoBehaviour
     [SerializeField] private Transform questionListContainer;
     [SerializeField] private GameObject questionScoreItemPrefab;
     [SerializeField] private Button closeButton;
+    [SerializeField] private Image graphImage; // Image element for the graph background
 
     [Header("Score Colors")]
     [SerializeField] private Color excellentColor = new Color(0.2f, 0.8f, 0.2f);
@@ -25,8 +26,14 @@ public class GameSummaryScreen : MonoBehaviour
     [SerializeField] private Color needsImprovementColor = new Color(0.9f, 0.3f, 0.3f);
 
     private FeedbackManager feedbackManager;
+    private FeedbackComparisonUI feedbackComparisonUI;
     private List<GameObject> questionItems = new List<GameObject>();
     private bool hasBeenInitialized = false; // Track if Start() has already run
+    
+    // Store original RectTransform values for resetting when switching modes
+    private Vector2 originalOverallScoreAnchoredPos;
+    private Vector2 originalTotalQuestionsAnchoredPos;
+    private Vector2 originalGraphImageAnchoredPos;
     [Header("Graph")]
     [SerializeField] private RectTransform graphContainer;
     [SerializeField] private Color graphBarColor = new Color(0.3f, 0.6f, 1f);
@@ -133,6 +140,37 @@ public class GameSummaryScreen : MonoBehaviour
             Debug.Log("FeedbackManager found successfully!");
         }
 
+        // Get FeedbackComparisonUI instance to check DQN-only mode
+        if (feedbackComparisonUI == null)
+        {
+            feedbackComparisonUI = FindObjectOfType<FeedbackComparisonUI>(true);
+        }
+
+        // Store original positions if not already stored
+        if (overallScoreText != null && originalOverallScoreAnchoredPos == Vector2.zero)
+        {
+            originalOverallScoreAnchoredPos = overallScoreText.GetComponent<RectTransform>().anchoredPosition;
+        }
+        if (totalQuestionsText != null && originalTotalQuestionsAnchoredPos == Vector2.zero)
+        {
+            originalTotalQuestionsAnchoredPos = totalQuestionsText.GetComponent<RectTransform>().anchoredPosition;
+        }
+        if (graphImage != null && originalGraphImageAnchoredPos == Vector2.zero)
+        {
+            originalGraphImageAnchoredPos = graphImage.GetComponent<RectTransform>().anchoredPosition;
+        }
+
+        // Check if DQN-only mode is enabled and adjust layout accordingly
+        bool dqnOnlyMode = feedbackComparisonUI != null && feedbackComparisonUI.showOnlyDQN;
+        if (dqnOnlyMode)
+        {
+            CenterElementsForDQNOnly();
+        }
+        else
+        {
+            RestoreElementPositions();
+        }
+
         // Clear previous items
         ClearQuestionItems();
 
@@ -185,47 +223,57 @@ public class GameSummaryScreen : MonoBehaviour
         // Update average breakdown
         if (averageBreakdownText != null && breakdown.questionCount > 0)
         {
-            // Get DQN and PPO breakdowns
-            var dqnBreakdown = feedbackManager.GetDQNScoreBreakdown();
-            var ppoBreakdown = feedbackManager.GetPPOScoreBreakdown();
-            
-            Debug.Log($"Feedback B breakdown: Questions={dqnBreakdown.questionCount}, Overall={dqnBreakdown.avgOverall:F2}");
-            Debug.Log($"Feedback A breakdown: Questions={ppoBreakdown.questionCount}, Overall={ppoBreakdown.avgOverall:F2}");
-
-            string breakdownText = "<b>Average Performance Breakdown:</b>\n\n";
-            
-            // Overall average (from selected feedback)
-            breakdownText += $"<b>Your Selected Feedback:</b>\n";
-            breakdownText += $"  Overall: {GetColoredScore(breakdown.avgOverall)}\n";
-            breakdownText += $"  Confidence: {GetColoredScore(breakdown.avgConfidence)}\n";
-            breakdownText += $"  Clarity: {GetColoredScore(breakdown.avgClarity)}\n";
-            breakdownText += $"  Pace: {GetColoredScore(breakdown.avgPace)}\n";
-            breakdownText += $"  Tone: {GetColoredScore(breakdown.avgTone)}\n\n";
-
-            // DQN average
-            if (dqnBreakdown.questionCount > 0)
+            // Check if DQN-only mode is enabled - if so, hide breakdown
+            if (dqnOnlyMode)
             {
-                breakdownText += $"<b>Feedback B Algorithm Scores:</b>\n";
-                breakdownText += $"  Overall: {GetColoredScore(dqnBreakdown.avgOverall)}\n";
-                breakdownText += $"  Confidence: {GetColoredScore(dqnBreakdown.avgConfidence)}\n";
-                breakdownText += $"  Clarity: {GetColoredScore(dqnBreakdown.avgClarity)}\n";
-                breakdownText += $"  Pace: {GetColoredScore(dqnBreakdown.avgPace)}\n";
-                breakdownText += $"  Tone: {GetColoredScore(dqnBreakdown.avgTone)}\n\n";
+                averageBreakdownText.text = "";
+                Debug.Log("DQN-only mode: Hiding feedback breakdown details");
             }
-
-            // PPO average
-            if (ppoBreakdown.questionCount > 0)
+            else
             {
-                breakdownText += $"<b>Feedback A Algorithm Scores:</b>\n";
-                breakdownText += $"  Overall: {GetColoredScore(ppoBreakdown.avgOverall)}\n";
-                breakdownText += $"  Confidence: {GetColoredScore(ppoBreakdown.avgConfidence)}\n";
-                breakdownText += $"  Clarity: {GetColoredScore(ppoBreakdown.avgClarity)}\n";
-                breakdownText += $"  Pace: {GetColoredScore(ppoBreakdown.avgPace)}\n";
-                breakdownText += $"  Tone: {GetColoredScore(ppoBreakdown.avgTone)}";
-            }
+                // Get DQN and PPO breakdowns
+                var dqnBreakdown = feedbackManager.GetDQNScoreBreakdown();
+                var ppoBreakdown = feedbackManager.GetPPOScoreBreakdown();
+                
+                Debug.Log($"Feedback B breakdown: Questions={dqnBreakdown.questionCount}, Overall={dqnBreakdown.avgOverall:F2}");
+                Debug.Log($"Feedback A breakdown: Questions={ppoBreakdown.questionCount}, Overall={ppoBreakdown.avgOverall:F2}");
 
-            averageBreakdownText.text = breakdownText;
-            Debug.Log($"Breakdown text set ({breakdownText.Length} chars):\n{breakdownText}");
+                string breakdownText = "<b>Average Performance Breakdown:</b>\n\n";
+                
+                // Overall average (from selected feedback)
+                breakdownText += $"<b>Your Selected Feedback:</b>\n";
+                breakdownText += $"  Overall: {GetColoredScore(breakdown.avgOverall)}\n";
+                breakdownText += $"  Confidence: {GetColoredScore(breakdown.avgConfidence)}\n";
+                breakdownText += $"  Clarity: {GetColoredScore(breakdown.avgClarity)}\n";
+                breakdownText += $"  Pace: {GetColoredScore(breakdown.avgPace)}\n";
+                breakdownText += $"  Tone: {GetColoredScore(breakdown.avgTone)}\n\n";
+
+                // DQN average
+                if (dqnBreakdown.questionCount > 0)
+                {
+                    breakdownText += $"<b>Feedback B Algorithm Scores:</b>\n";
+                    breakdownText += $"  Overall: {GetColoredScore(dqnBreakdown.avgOverall)}\n";
+                    breakdownText += $"  Confidence: {GetColoredScore(dqnBreakdown.avgConfidence)}\n";
+                    breakdownText += $"  Clarity: {GetColoredScore(dqnBreakdown.avgClarity)}\n";
+                    breakdownText += $"  Pace: {GetColoredScore(dqnBreakdown.avgPace)}\n";
+                    breakdownText += $"  Tone: {GetColoredScore(dqnBreakdown.avgTone)}\n\n";
+                }
+
+                // PPO average
+                if (ppoBreakdown.questionCount > 0)
+                {
+                    breakdownText += $"<b>Feedback A Algorithm Scores:</b>\n";
+                    breakdownText += $"  Overall: {GetColoredScore(ppoBreakdown.avgOverall)}\n";
+                    breakdownText += $"  Confidence: {GetColoredScore(ppoBreakdown.avgConfidence)}\n";
+                    breakdownText += $"  Clarity: {GetColoredScore(ppoBreakdown.avgClarity)}\n";
+                    breakdownText += $"  Pace: {GetColoredScore(ppoBreakdown.avgPace)}\n";
+                    breakdownText += $"  Tone: {GetColoredScore(ppoBreakdown.avgTone)}";
+                }
+
+                averageBreakdownText.text = breakdownText;
+                averageBreakdownText.alignment = TextAlignmentOptions.Center;
+                Debug.Log($"Breakdown text set ({breakdownText.Length} chars):\n{breakdownText}");
+            }
         }
         else if (averageBreakdownText != null)
         {
@@ -253,6 +301,106 @@ public class GameSummaryScreen : MonoBehaviour
         
         // Render performance graph once the panel is active (rect sizes available)
         RenderPerformanceGraph();
+    }
+
+    /// <summary>
+    /// Center elements for DQN-only mode
+    /// </summary>
+    private void CenterElementsForDQNOnly()
+    {
+        Debug.Log("CenterElementsForDQNOnly: Adjusting layout for DQN-only mode");
+        
+        // Center Overall Score Text
+        if (overallScoreText != null)
+        {
+            RectTransform overallRt = overallScoreText.GetComponent<RectTransform>();
+            if (overallRt != null)
+            {
+                overallRt.anchorMin = new Vector2(0.5f, 0.5f);
+                overallRt.anchorMax = new Vector2(0.5f, 0.5f);
+                overallRt.pivot = new Vector2(0.5f, 0.5f);
+                overallRt.anchoredPosition = new Vector2(0, 65); // Keep the multiline score block above the question count
+                Debug.Log("Centered Overall Score Text");
+            }
+        }
+        
+        // Center Total Questions Text
+        if (totalQuestionsText != null)
+        {
+            RectTransform totalRt = totalQuestionsText.GetComponent<RectTransform>();
+            if (totalRt != null)
+            {
+                totalRt.anchorMin = new Vector2(0.5f, 0.5f);
+                totalRt.anchorMax = new Vector2(0.5f, 0.5f);
+                totalRt.pivot = new Vector2(0.5f, 0.5f);
+                totalRt.anchoredPosition = new Vector2(0, -55); // Leave room for the large percentage
+                Debug.Log("Centered Total Questions Text");
+            }
+        }
+        
+        // Center Image (graph background)
+        if (graphImage != null)
+        {
+            RectTransform imageRt = graphImage.GetComponent<RectTransform>();
+            if (imageRt != null)
+            {
+                imageRt.anchorMin = new Vector2(0.5f, 0.5f);
+                imageRt.anchorMax = new Vector2(0.5f, 0.5f);
+                imageRt.pivot = new Vector2(0.5f, 0.5f);
+                imageRt.anchoredPosition = new Vector2(0, -155); // Below the separated text blocks
+                Debug.Log("Centered Image");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restore elements to original positions
+    /// </summary>
+    private void RestoreElementPositions()
+    {
+        Debug.Log("RestoreElementPositions: Restoring original layout");
+        
+        // Restore Overall Score Text
+        if (overallScoreText != null)
+        {
+            RectTransform overallRt = overallScoreText.GetComponent<RectTransform>();
+            if (overallRt != null)
+            {
+                overallRt.anchorMin = Vector2.zero;
+                overallRt.anchorMax = Vector2.zero;
+                overallRt.pivot = new Vector2(0.5f, 0.5f);
+                overallRt.anchoredPosition = originalOverallScoreAnchoredPos;
+                Debug.Log($"Restored Overall Score Text to {originalOverallScoreAnchoredPos}");
+            }
+        }
+        
+        // Restore Total Questions Text
+        if (totalQuestionsText != null)
+        {
+            RectTransform totalRt = totalQuestionsText.GetComponent<RectTransform>();
+            if (totalRt != null)
+            {
+                totalRt.anchorMin = Vector2.zero;
+                totalRt.anchorMax = Vector2.zero;
+                totalRt.pivot = new Vector2(0.5f, 0.5f);
+                totalRt.anchoredPosition = originalTotalQuestionsAnchoredPos;
+                Debug.Log($"Restored Total Questions Text to {originalTotalQuestionsAnchoredPos}");
+            }
+        }
+        
+        // Restore Image
+        if (graphImage != null)
+        {
+            RectTransform imageRt = graphImage.GetComponent<RectTransform>();
+            if (imageRt != null)
+            {
+                imageRt.anchorMin = Vector2.zero;
+                imageRt.anchorMax = Vector2.zero;
+                imageRt.pivot = new Vector2(0.5f, 0.5f);
+                imageRt.anchoredPosition = originalGraphImageAnchoredPos;
+                Debug.Log($"Restored Image to {originalGraphImageAnchoredPos}");
+            }
+        }
     }
 
     /// <summary>

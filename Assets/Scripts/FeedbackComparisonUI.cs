@@ -76,6 +76,10 @@ public class FeedbackComparisonUI : MonoBehaviour
     [SerializeField] private Color selectedColor = new Color(0.3f, 0.6f, 1f);
     [SerializeField] private float fadeInDuration = 0.5f;
 
+    [Header("Display Mode")]
+    [SerializeField] public bool showOnlyDQN = false;
+    [Tooltip("When true, only DQN feedback is displayed. When false, both DQN and PPO are shown side-by-side.")]
+
     [Header("Events")]
     public UnityEvent<FeedbackChoice> OnFeedbackChosen;
 
@@ -164,9 +168,14 @@ public class FeedbackComparisonUI : MonoBehaviour
         Debug.Log("🎯 FeedbackComparisonUI: isDisplaying = TRUE");
         comparisonStartTime = Time.time;
 
-        // Set instruction text
+        // Set instruction text based on display mode
         if (instructionText != null)
-            instructionText.text = "Choose the feedback that would help you most:";
+        {
+            if (showOnlyDQN)
+                instructionText.text = "Review your feedback:";
+            else
+                instructionText.text = "Choose the feedback that would help you most:";
+        }
 
         // Populate DQN side
         PopulateFeedbackPanel(
@@ -176,23 +185,42 @@ public class FeedbackComparisonUI : MonoBehaviour
             currentDQNFeedback, "Feedback B"
         );
 
-        // Populate PPO side
-        PopulateFeedbackPanel(
-            ppoTitle, ppoMessage, ppoPerformanceText,
-            ppoConfidenceBar, ppoClarityBar, ppoPaceBar, ppoToneBar, ppoOverallBar,
-            ppoConfidenceValue, ppoClarityValue, ppoPaceValue, ppoToneValue,
-            currentPPOFeedback, "Feedback A"
-        );
+        // Show/hide PPO panel based on display mode
+        if (ppoPanel != null)
+            ppoPanel.SetActive(!showOnlyDQN);
 
-        // Calculate and display overall question score (average of DQN and PPO)
-        if (overallQuestionScoreText != null && currentDQNFeedback != null && currentPPOFeedback != null)
+        // Populate PPO side only if not in DQN-only mode
+        if (!showOnlyDQN)
         {
-            float dqnOverall = currentDQNFeedback.currentPerformance.overall;
-            float ppoOverall = currentPPOFeedback.currentPerformance.overall;
-            float averageOverall = (dqnOverall + ppoOverall) / 2f;
-            int percentage = Mathf.RoundToInt(averageOverall * 100f);
+            PopulateFeedbackPanel(
+                ppoTitle, ppoMessage, ppoPerformanceText,
+                ppoConfidenceBar, ppoClarityBar, ppoPaceBar, ppoToneBar, ppoOverallBar,
+                ppoConfidenceValue, ppoClarityValue, ppoPaceValue, ppoToneValue,
+                currentPPOFeedback, "Feedback A"
+            );
+        }
 
-            Color scoreColor = GetScoreColor(averageOverall);
+        // Calculate and display overall question score
+        if (overallQuestionScoreText != null && currentDQNFeedback != null)
+        {
+            float scoreOverall;
+            
+            if (showOnlyDQN)
+            {
+                // In DQN-only mode, use DQN's overall score
+                scoreOverall = currentDQNFeedback.currentPerformance.overall;
+            }
+            else
+            {
+                // In comparison mode, use average of DQN and PPO
+                if (currentPPOFeedback != null)
+                    scoreOverall = (currentDQNFeedback.currentPerformance.overall + currentPPOFeedback.currentPerformance.overall) / 2f;
+                else
+                    scoreOverall = currentDQNFeedback.currentPerformance.overall;
+            }
+            
+            int percentage = Mathf.RoundToInt(scoreOverall * 100f);
+            Color scoreColor = GetScoreColor(scoreOverall);
             string hexColor = ColorUtility.ToHtmlStringRGB(scoreColor);
 
             overallQuestionScoreText.text = $"<b>Overall Question Score:</b> <color=#{hexColor}>{percentage}%</color>";
@@ -200,13 +228,18 @@ public class FeedbackComparisonUI : MonoBehaviour
             // Ensure the bar graph will use the same overall score that the player sees
             if (FeedbackManager.Instance != null)
             {
-                FeedbackManager.Instance.SetNextHistoryOverall(averageOverall);
+                FeedbackManager.Instance.SetNextHistoryOverall(scoreOverall);
             }
         }
 
-        // Enable buttons
+        // Enable buttons based on display mode
         if (chooseDQNButton != null) chooseDQNButton.interactable = true;
-        if (choosePPOButton != null) choosePPOButton.interactable = true;
+        if (choosePPOButton != null) 
+        {
+            // Hide PPO button if in DQN-only mode
+            choosePPOButton.gameObject.SetActive(!showOnlyDQN);
+            choosePPOButton.interactable = !showOnlyDQN;
+        }
 
         // Show panel with fade in
         if (comparisonPanel != null)
