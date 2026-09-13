@@ -102,3 +102,6 @@ Assets/StreamingAssets/*
 
 # But keep this placeholder so the folder itself stays
 !.gitkeep
+
+# Ignore .DS_Store files
+**/.DS_Store
